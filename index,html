@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minesweeper - Shop-System</title>
+    <style>
+        body {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+        #left-panel, #right-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+        }
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 30px);
+            gap: 2px;
+            margin-top: 10px;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            background-color: #ddd;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 18px;
+            user-select: none;
+        }
+        .cell.revealed {
+            background-color: #bbb;
+            cursor: default;
+        }
+        .cell.bomb {
+            background-color: #e74c3c;
+            color: #fff;
+        }
+        .cell.marked {
+            background-color: #ffcccb;
+            color: #333;
+        }
+        #coin-counter, #shop, #items-list {
+            margin-bottom: 10px;
+        }
+        .item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 200px;
+            margin: 5px 0;
+            padding: 5px;
+            border: 1px solid #ccc;
+            background-color: #eee;
+            cursor: pointer;
+        }
+        .item-logo {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        #items-list {
+            margin-top: 20px;
+        }
+        #shop {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            border: 2px solid #888;
+            background-color: #fafafa;
+            padding: 15px;
+            width: 220px;
+        }
+        #close-shop {
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        #game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border: 2px solid #888;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="left-panel">
+        <div id="coin-counter">Münzen: 0</div>
+        <div id="game-board"></div>
+    </div>
+    <div id="right-panel">
+        <div id="shop">
+            <h3>Shop</h3>
+            <div id="shop-items"></div>
+            <button id="close-shop">Schließen</button>
+        </div>
+        <div id="items-list">
+            <h3>Gekaufte Items</h3>
+            <div id="purchased-items"></div>
+        </div>
+    </div>
+
+    <div id="game-over">
+        <h2>Game Over!</h2>
+        <button onclick="restartGame()">Neustarten</button>
+    </div>
+
+    <script>
+        let rows = 5;
+        let cols = 5;
+        let bombCount = 3;
+        let level = 1;
+        let coins = 0;
+        let itemsOwned = [];
+        let board = [];
+        let gameOver = false;
+        let firstClick = true;
+        let extraLifeUsed = false;
+        let autoRevealUsed = false;
+
+        const shopItems = [
+            { name: "Extra Leben", logo: "❤️", cost: 50, description: "Erhalte ein zusätzliches Leben." },
+            { name: "Mehr Münzen", logo: "💰", cost: 60, description: "Erhalte 2 Münzen pro Feld." },
+            { name: "Auto-Reveal", logo: "🤖", cost: 90, description: "Zeigt 3 zufällige Bomben an." },
+            { name: "Doppelklick-Boost", logo: "🖱️", cost: 25, description: "Doppelklick zeigt mehr Felder auf einmal." },
+            { name: "Radar", logo: "📡", cost: 70, description: "Zeigt bombenarme Bereiche an." }
+        ];
+
+        const boardElement = document.getElementById('game-board');
+        const coinCounterElement = document.getElementById('coin-counter');
+        const shopElement = document.getElementById('shop');
+        const shopItemsElement = document.getElementById('shop-items');
+        const purchasedItemsElement = document.getElementById('purchased-items');
+        const closeShopButton = document.getElementById('close-shop');
+
+        closeShopButton.addEventListener('click', () => {
+            shopElement.style.display = 'none';
+            nextLevel();
+        });
+
+        function initBoard() {
+            boardElement.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+            board = Array(rows).fill().map(() => Array(cols).fill().map(() => ({
+                revealed: false,
+                bomb: false,
+                count: 0,
+                marked: false
+            })));
+            firstClick = true; 
+            extraLifeUsed = false; 
+            autoRevealUsed = false; // Reset auto-reveal each level
+            renderBoard();
+            updateCoinCounter();
+        }
+
+        function placeBombs(excludeRow, excludeCol) {
+            let bombsPlaced = 0;
+            while (bombsPlaced < bombCount) {
+                const row = Math.floor(Math.random() * rows);
+                const col = Math.floor(Math.random() * cols);
+                if (!board[row][col].bomb && (Math.abs(row - excludeRow) > 1 || Math.abs(col - excludeCol) > 1)) {
+                    board[row][col].bomb = true;
+                    bombsPlaced++;
+                }
+            }
+        }
+
+        function calculateCounts() {
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (board[r][c].bomb) continue;
+                    let count = 0;
+                    for (let i = -1; i <= 1; i++) {
+                        for (let j = -1; j <= 1; j++) {
+                            const nr = r + i;
+                            const nc = c + j;
+                            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && board[nr][nc].bomb) {
+                                count++;
+                            }
+                        }
+                    }
+                    board[r][c].count = count;
+                }
+            }
+        }
+
+        function renderBoard() {
+            boardElement.innerHTML = '';
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const cellElement = document.createElement('div');
+                    cellElement.classList.add('cell');
+                    cellElement.dataset.row = r;
+                    cellElement.dataset.col = c;
+                    cellElement.addEventListener('click', onCellClick);
+                    cellElement.addEventListener('dblclick', () => onNumberClick(r, c));
+                    cellElement.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        toggleMarkCell(r, c);
+                    });
+
+                    if (board[r][c].revealed) {
+                        cellElement.classList.add('revealed');
+                        if (board[r][c].bomb) {
+                            cellElement.classList.add('bomb');
+                            cellElement.textContent = '💣';
+                        } else if (board[r][c].count > 0) {
+                            cellElement.textContent = board[r][c].count;
+                        }
+                    } else if (board[r][c].marked) {
+                        cellElement.classList.add('marked');
+                        cellElement.textContent = '🚩';
+                    }
+
+                    boardElement.appendChild(cellElement);
+                }
+            }
+        }
+
+        function onCellClick(e) {
+            if (gameOver) return;
+            const row = parseInt(e.target.dataset.row);
+            const col = parseInt(e.target.dataset.col);
+
+            if (firstClick) {
+                firstClick = false;
+                placeBombs(row, col);
+                calculateCounts();
+                
+                if (itemsOwned.some(item => item.name === "Auto-Reveal") && !autoRevealUsed) {
+                    autoRevealUsed = true; // Mark auto-reveal as used for this level
+                    revealRandomBombs(3); // Reveal 3 random bombs
+                }
+
+                revealCell(row, col);
+
+                if (board[row][col].count === 0) {
+                    for (let i = -1; i <= 1; i++) {
+                        for (let j = -1; j <= 1; j++) {
+                            revealCell(row + i, col + j);
+                        }
+                    }
+                }
+                renderBoard();
+                checkWin();
+            } else {
+                if (board[row][col].marked) return;
+                revealCell(row, col);
+                renderBoard();
+                checkWin();
+            }
+        }
+
+        function revealRandomBombs(count) {
+            const bombCells = [];
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (board[r][c].bomb) bombCells.push(board[r][c]);
+                }
+            }
+            for (let i = 0; i < count && i < bombCells.length; i++) {
+                bombCells[i].revealed = true;
+                bombCells[i].marked = true;
+            }
+        }
+
+        function onNumberClick(row, col) {
+            if (!board[row][col].revealed || board[row][col].count === 0) return;
+            const immediateSurroundingCells = getSurroundingCells(row, col, 1);
+            const markedCount = immediateSurroundingCells.filter(cell => cell.marked).length;
+
+            if (markedCount === board[row][col].count) {
+                const range = itemsOwned.some(item => item.name === "Doppelklick-Boost") ? 2 : 1;
+                const revealSurroundingCells = getSurroundingCells(row, col, range);
+
+                revealSurroundingCells.forEach(cell => {
+                    if (!cell.revealed && !cell.bomb && !cell.marked) {
+                        revealCell(cell.row, cell.col);
+                    }
+                });
+                renderBoard();
+                checkWin();
+            }
+        }
+
+        function getSurroundingCells(row, col, range = 1) {
+            const cells = [];
+            for (let i = -range; i <= range; i++) {
+                for (let j = -range; j <= range; j++) {
+                    const nr = row + i;
+                    const nc = col + j;
+                    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                        cells.push({ ...board[nr][nc], row: nr, col: nc });
+                    }
+                }
+            }
+            return cells;
+        }
+
+        function toggleMarkCell(row, col) {
+            if (board[row][col].revealed || gameOver) return;
+            board[row][col].marked = !board[row][col].marked;
+            renderBoard();
+        }
+
+        function showGameOver() {
+            document.getElementById('game-over').style.display = 'block';
+        }
+
+        function restartGame() {
+            document.getElementById('game-over').style.display = 'none';
+            level = 1;
+            rows = 5;
+            cols = 5;
+            bombCount = 3;
+            coins = 0;
+            itemsOwned = [];
+            gameOver = false;
+            firstClick = true;
+            extraLifeUsed = false;
+            autoRevealUsed = false;
+            initBoard();
+            updateCoinCounter();
+        }
+
+        function revealCell(row, col) {
+            if (row < 0 || row >= rows || col < 0 || col >= cols || board[row][col].revealed) return;
+            board[row][col].revealed = true;
+
+            if (board[row][col].bomb) {
+                if (itemsOwned.some(item => item.name === "Extra Leben") && !extraLifeUsed) {
+                    extraLifeUsed = true;
+                    alert("Du hast eine Bombe getroffen, aber dein Extra Leben hat dich gerettet!");
+                    return;
+                } else {
+                    gameOver = true;
+                    showGameOver();
+                    revealAllBombs();
+                }
+            } else {
+                let coinGain = 1;
+                coins += coinGain;
+                updateCoinCounter();
+                if (board[row][col].count === 0) {
+                    for (let i = -1; i <= 1; i++) {
+                        for (let j = -1; j <= 1; j++) {
+                            revealCell(row + i, col + j);
+                        }
+                    }
+                }
+            }
+        }
+
+        function revealAllBombs() {
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (board[r][c].bomb) {
+                        board[r][c].revealed = true;
+                    }
+                }
+            }
+            renderBoard();
+        }
+
+        function checkWin() {
+            let revealedCount = 0;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (board[r][c].revealed && !board[r][c].bomb) {
+                        revealedCount++;
+                    }
+                }
+            }
+            if (revealedCount === rows * cols - bombCount) {
+                alert(`Level ${level} geschafft!`);
+                openShop();
+            }
+        }
+
+        function nextLevel() {
+            level++;
+            rows++;
+            cols++;
+            bombCount += 2;
+            gameOver = false;
+            firstClick = true;
+            initBoard();
+        }
+
+        function updateCoinCounter() {
+            coinCounterElement.textContent = `Münzen: ${coins}`;
+        }
+
+        function openShop() {
+            shopElement.style.display = 'flex';
+            displayShopItems();
+        }
+
+        function displayShopItems() {
+            shopItemsElement.innerHTML = '';
+            const itemsForSale = getRandomItems(3);
+            itemsForSale.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.classList.add('item');
+                itemElement.innerHTML = `<span class="item-logo">${item.logo}</span> ${item.name} - ${item.cost} Münzen`;
+                itemElement.addEventListener('click', () => purchaseItem(item));
+                shopItemsElement.appendChild(itemElement);
+            });
+        }
+
+        function purchaseItem(item) {
+            if (coins >= item.cost) {
+                coins -= item.cost;
+                itemsOwned.push(item);
+                updateCoinCounter();
+                updatePurchasedItems();
+            } else {
+                alert("Nicht genug Münzen!");
+            }
+        }
+
+        function updatePurchasedItems() {
+            purchasedItemsElement.innerHTML = '';
+            itemsOwned.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.textContent = `${item.logo} ${item.name}`;
+                purchasedItemsElement.appendChild(itemElement);
+            });
+        }
+
+        function getRandomItems(count) {
+            const shuffled = shopItems.sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, count);
+        }
+
+        initBoard();
+    </script>
+</body>
+</html>
