@@ -250,48 +250,48 @@
 
         let clickCount = 0;
 
-function onCellClick(e) {
-    if (gameOver) return;
-    const row = parseInt(e.target.dataset.row);
-    const col = parseInt(e.target.dataset.col);
+        function onCellClick(e) {
+            if (gameOver) return;
+            const row = parseInt(e.target.dataset.row);
+            const col = parseInt(e.target.dataset.col);
 
-    // Doppelklick-Check (Fallback-Lösung)
-    clickCount++;
-    setTimeout(() => {
-        if (clickCount === 2) {
-            onNumberClick(row, col); // Doppelklick-Funktion bei Doppelklick oder schnellem Doppelklick
-        }
-        clickCount = 0;
-    }, 300);
-
-    if (firstClick) {
-        firstClick = false;
-        placeBombs(row, col);
-        calculateCounts();
-
-        if (itemsOwned.some(item => item.name === "Auto-Reveal") && !autoRevealUsed) {
-            autoRevealUsed = true;
-            revealRandomBombs(3);
-        }
-
-        revealCell(row, col);
-
-        if (board[row][col].count === 0) {
-            for (let i = -1; i <= 1; i++) {
-                for (let j = -1; j <= 1; j++) {
-                    revealCell(row + i, col + j);
+            // Doppelklick-Check (Fallback-Lösung)
+            clickCount++;
+            setTimeout(() => {
+                if (clickCount === 2) {
+                    onNumberClick(row, col); // Doppelklick-Funktion bei Doppelklick oder schnellem Doppelklick
                 }
+                clickCount = 0;
+            }, 300);
+
+            if (firstClick) {
+                firstClick = false;
+                placeBombs(row, col);
+                calculateCounts();
+
+                if (itemsOwned.some(item => item.name === "Auto-Reveal") && !autoRevealUsed) {
+                    autoRevealUsed = true;
+                    revealRandomBombs(3);
+                }
+
+                revealCell(row, col);
+
+                if (board[row][col].count === 0) {
+                    for (let i = -1; i <= 1; i++) {
+                        for (let j = -1; j <= 1; j++) {
+                            revealCell(row + i, col + j);
+                        }
+                    }
+                }
+                renderBoard();
+                checkWin();
+            } else {
+                if (board[row][col].marked) return;
+                revealCell(row, col);
+                renderBoard();
+                checkWin();
             }
         }
-        renderBoard();
-        checkWin();
-    } else {
-        if (board[row][col].marked) return;
-        revealCell(row, col);
-        renderBoard();
-        checkWin();
-    }
-}
 
 
         function revealRandomBombs(count) {
@@ -480,3 +480,4 @@ function onCellClick(e) {
     </script>
 </body>
 </html>
+
