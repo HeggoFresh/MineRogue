@@ -293,7 +293,6 @@
             }
         }
 
-
         function revealRandomBombs(count) {
             const bombCells = [];
             for (let r = 0; r < rows; r++) {
@@ -309,10 +308,21 @@
 
         function onNumberClick(row, col) {
             if (!board[row][col].revealed || board[row][col].count === 0) return;
-            const immediateSurroundingCells = getSurroundingCells(row, col, 1);
-            const markedCount = immediateSurroundingCells.filter(cell => cell.marked).length;
+
+            const surroundingCells = getSurroundingCells(row, col, 1);
+            const markedCount = surroundingCells.filter(cell => cell.marked).length;
+            const correctFlags = surroundingCells.every(cell => !cell.marked || cell.bomb);
 
             if (markedCount === board[row][col].count) {
+                if (!correctFlags) {
+                    // Spieler verliert, da eine falsch gesetzte Flagge vorhanden ist
+                    alert("Game Over! Eine falsche Flagge wurde gesetzt.");
+                    gameOver = true;
+                    showGameOver();
+                    revealAllBombs();
+                    return;
+                }
+                
                 const range = itemsOwned.some(item => item.name === "Doppelklick-Boost") ? 2 : 1;
                 const revealSurroundingCells = getSurroundingCells(row, col, range);
 
@@ -480,4 +490,3 @@
     </script>
 </body>
 </html>
-
