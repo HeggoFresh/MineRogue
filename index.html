@@ -97,12 +97,27 @@
             z-index: 10;
             display: none;
         }
+        #rules {
+            margin-top: 20px;
+            font-size: 14px;
+            max-width: 250px;
+            line-height: 1.5;
+            color: #333;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
     <div id="left-panel">
         <div id="coin-counter">Münzen: 0</div>
         <div id="game-board"></div>
+        <div id="rules">
+            <h3>Spielregeln</h3>
+            <p>- Klicke auf ein Feld, um es aufzudecken. Wenn es eine Bombe enthält, verlierst du das Spiel.</p>
+            <p>- Setze eine Flagge, indem du mit der rechten Maustaste auf ein Feld klickst. Markiere Felder, von denen du denkst, dass sie Bomben enthalten.</p>
+            <p>- Doppelklicke auf ein Feld mit einer Zahl, wenn du bereits die entsprechende Anzahl an Feldern markiert hast, um die umliegenden Felder automatisch aufzudecken.</p>
+            <p>- Kaufe im Shop Upgrades und Fähigkeiten, die dir beim Spiel helfen!</p>
+        </div>
     </div>
     <div id="right-panel">
         <div id="shop">
@@ -319,24 +334,15 @@
             renderBoard();
         }
 
-        function showGameOver() {
-            document.getElementById('game-over').style.display = 'block';
-        }
-
-        function restartGame() {
-            document.getElementById('game-over').style.display = 'none';
-            level = 1;
-            rows = 5;
-            cols = 5;
-            bombCount = 3;
-            coins = 0;
-            itemsOwned = [];
-            gameOver = false;
-            firstClick = true;
-            extraLifeUsed = false;
-            autoRevealUsed = false;
-            initBoard();
-            updateCoinCounter();
+        function purchaseItem(item) {
+            if (coins >= item.cost) {
+                coins -= item.cost;
+                itemsOwned.push(item);
+                updateCoinCounter();
+                updatePurchasedItems();
+            } else {
+                alert("Nicht genug Münzen!");
+            }
         }
 
         function revealCell(row, col) {
@@ -424,17 +430,6 @@
             });
         }
 
-        function purchaseItem(item) {
-            if (coins >= item.cost) {
-                coins -= item.cost;
-                itemsOwned.push(item);
-                updateCoinCounter();
-                updatePurchasedItems();
-            } else {
-                alert("Nicht genug Münzen!");
-            }
-        }
-
         function updatePurchasedItems() {
             purchasedItemsElement.innerHTML = '';
             itemsOwned.forEach(item => {
@@ -447,6 +442,26 @@
         function getRandomItems(count) {
             const shuffled = shopItems.sort(() => 0.5 - Math.random());
             return shuffled.slice(0, count);
+        }
+
+        function showGameOver() {
+            document.getElementById('game-over').style.display = 'block';
+        }
+
+        function restartGame() {
+            document.getElementById('game-over').style.display = 'none';
+            level = 1;
+            rows = 5;
+            cols = 5;
+            bombCount = 3;
+            coins = 0;
+            itemsOwned = [];
+            gameOver = false;
+            firstClick = true;
+            extraLifeUsed = false;
+            autoRevealUsed = false;
+            initBoard();
+            updateCoinCounter();
         }
 
         initBoard();
